@@ -3,6 +3,8 @@ from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from common.phone import normalize_phone
+from .models import KYCDocument, KYCSubmission, User
+import os
 
 from .models import User
 
@@ -129,3 +131,47 @@ class ChangePasswordSerializer(serializers.Serializer):
         except DjangoValidationError as exc:
             raise serializers.ValidationError({"new_password": list(exc.messages)})
         return attrs
+
+KYC_ALLOWED_EXTENSIONS = {".jpg", ".jpeg", ".png", ".pdf"}
+KYC_MAX_FILE_SIZE = 5 * 1024 * 1024  # 5 MB
+KYC_MAX_DOCUMENTS = 5
+
+
+class KYCSubmitSerializer(serializers.Serializer):
+    document_types = serializers.ListField(
+        child=serializers.ChoiceField(choices=KYCDocument.DocumentType.choices),
+        allow_empty=False, max_length=KYC_MAX_DOCUMENTS,
+    )
+    documents = serializers.ListField(
+        child=serializers.FileField(), allow_empty=False, max_length=KYC_MAX_DOCUMENTS,
+    )
+
+    def validate_documents(self, files):
+        for f in files:
+            if os.path.splitext(f.name)[1].lower() not in KYC_ALLOWED_EXTENSIONS:
+                raise serializers.ValidationError("Only JPG, PNG or PDF files are allowed.")
+            if f.size > KYC_MAX_FILE_SIZE:
+                raise serializers.ValidationError("Each file must be 5 MB or smaller.")
+        return files
+
+    def validate(self, attrs):
+        if len(attrs["document_types"]) != len(attrs["documents"]):
+            raise serializers.ValidationError(
+                "Send one document type for each file, in the same order."
+            )
+        return attrs
+
+
+class KYCSubmissionSerializer(serializers.ModelSerializer):
+    documents = serializers.SerializerMethodField()
+
+    class Meta:
+        model = KYCSubmission
+        fields = ["id", "submission_reference", "status", "submitted_at",
+                  "reviewed_at", "rejection_reason", "documents"]
+        read_only_fields = fields
+
+    def get_documents(self, obj):
+        # No file links on purpose: KYC files are never exposed to the app.
+        return [{"id": str(d.id), "document_type": d.document_type, "uploaded_at": d.uploaded_at}
+                for d in obj.documents.all()]

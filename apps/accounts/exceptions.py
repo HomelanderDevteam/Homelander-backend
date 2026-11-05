@@ -18,3 +18,8 @@ class DuplicateAccount(APIException):
     status_code = status.HTTP_409_CONFLICT
     default_detail = "An account with these details already exists."
     default_code = "duplicate_account"
+
+class KYCAlreadyActive(APIException):
+    status_code = status.HTTP_409_CONFLICT
+    default_detail = "You already have a KYC submission that is pending or approved."
+    default_code = "kyc_already_active"

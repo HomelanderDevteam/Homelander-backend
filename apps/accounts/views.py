@@ -5,6 +5,12 @@ from rest_framework.response import Response
 from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView
+from rest_framework.parsers import FormParser, MultiPartParser
+from rest_framework.parsers import FormParser, MultiPartParser
+
+
+
+from . import selectors
 
 from . import services
 from .serializers import (
@@ -16,6 +22,8 @@ from .serializers import (
     RegisterSerializer,
     TokenPairSerializer,
     UserSerializer,
+    KYCSubmissionSerializer,
+    KYCSubmitSerializer
 )
 
 TAG = ["Authentication"]
@@ -115,3 +123,28 @@ class ChangePasswordView(APIView):
         serializer.is_valid(raise_exception=True)
         tokens = services.change_password(user=request.user, new_password=serializer.validated_data["new_password"])
         return Response(tokens, status=status.HTTP_200_OK)
+
+class KYCView(APIView):
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
+
+    @extend_schema(responses={200: KYCSubmissionSerializer}, tags=TAG,
+                   summary="Get my latest KYC submission",
+                   description="Returns status NOT_SUBMITTED if the user has never submitted.")
+    def get(self, request):
+        submission = selectors.get_latest_kyc(request.user)
+        if submission is None:
+            return Response({"status": "NOT_SUBMITTED"})
+        return Response(KYCSubmissionSerializer(submission).data)
+
+    @extend_schema(request={"multipart/form-data": KYCSubmitSerializer},
+                   responses={201: KYCSubmissionSerializer}, tags=TAG,
+                   summary="Submit KYC documents")
+    def post(self, request):
+        serializer = KYCSubmitSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        data = serializer.validated_data
+        submission = services.submit_kyc(
+            user=request.user, documents=list(zip(data["document_types"], data["documents"]))
+        )
+        return Response(KYCSubmissionSerializer(submission).data, status=status.HTTP_201_CREATED)

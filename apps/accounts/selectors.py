@@ -16,3 +16,11 @@ def get_user_by_identifier(identifier):
     except ValueError:
         return None
     return User.objects.filter(phone_number=phone).first()
+
+def get_latest_kyc(user):
+    return user.kyc_submissions.prefetch_related("documents").first()
+
+
+def has_approved_kyc(user):
+    """Used later by the properties app: no approved KYC means no listing."""
+    return user.kyc_submissions.filter(status="APPROVED").exists()

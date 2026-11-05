@@ -10,6 +10,8 @@ from django.db import IntegrityError, transaction
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.token_blacklist.models import BlacklistedToken, OutstandingToken
 from rest_framework_simplejwt.tokens import RefreshToken
+from .exceptions import AccountDisabled, DuplicateAccount, InvalidCredentials, KYCAlreadyActive
+from .models import KYCDocument, KYCSubmission, User
 
 from .exceptions import AccountDisabled, DuplicateAccount, InvalidCredentials
 from .models import User
@@ -91,3 +93,23 @@ def update_profile(*, user, **fields):
         setattr(user, name, value)
     user.save()
     return user
+
+def submit_kyc(*, user, documents):
+    """documents is a list of (document_type, file) pairs."""
+    active = KYCSubmission.objects.filter(
+        user=user, status__in=[KYCSubmission.Status.PENDING, KYCSubmission.Status.APPROVED]
+    )
+    if active.exists():
+        raise KYCAlreadyActive()
+    try:
+        with transaction.atomic():
+            submission = KYCSubmission.objects.create(user=user)
+            for document_type, file in documents:
+                KYCDocument.objects.create(
+                    kyc_submission=submission, document_type=document_type, document=file
+                )
+    except IntegrityError:
+        # Two requests at the same moment; the database rule caught it.
+        raise KYCAlreadyActive()
+    logger.info("KYC submitted: %s by user %s", submission.submission_reference, user.id)
+    return submission

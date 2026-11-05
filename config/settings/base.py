@@ -24,6 +24,7 @@ def env_list(name, default=""):
 SECRET_KEY = os.environ.get("SECRET_KEY", "")
 DEBUG = env_bool("DEBUG", False)
 ALLOWED_HOSTS = env_list("ALLOWED_HOSTS", "localhost,127.0.0.1")
+MEDIA_ROOT = BASE_DIR / "private_media"
 
 # ---------------------------------------------------------------------------
 # Applications. Each HomeLander feature is its own app inside apps/ (modular monolith).

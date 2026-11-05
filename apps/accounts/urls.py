@@ -11,4 +11,5 @@ urlpatterns = [
     path("token/refresh/", views.RefreshView.as_view(), name="token-refresh"),
     path("me/", views.MeView.as_view(), name="me"),
     path("password/change/", views.ChangePasswordView.as_view(), name="password-change"),
+    path("kyc/", views.KYCView.as_view(), name="kyc"),
 ]
