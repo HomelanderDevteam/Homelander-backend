@@ -14,10 +14,11 @@ from django.utils.html import format_html
 from .models import KYCDocument, KYCSubmission, User
 
 
+
 class UserCreationForm(BaseUserCreationForm):
     class Meta:
         model = User
-        fields = ("phone_number", "first_name", "last_name", "email")
+        fields = ("email", "first_name", "last_name", "phone_number")
 
 
 class UserChangeForm(DjangoUserChangeForm):
@@ -30,22 +31,55 @@ class UserAdmin(DjangoUserAdmin):
     form = UserChangeForm
     add_form = UserCreationForm
     ordering = ("-date_joined",)
-    list_display = ("phone_number", "full_name", "email", "is_active", "is_staff", "date_joined")
+
+    list_display = (
+        "email",
+        "full_name",
+        "phone_number",
+        "is_active",
+        "is_staff",
+        "date_joined",
+    )
+
     list_filter = ("is_active", "is_staff", "is_superuser", "date_joined")
-    search_fields = ("phone_number", "email", "first_name", "last_name")
+    search_fields = ("email", "first_name", "last_name", "phone_number")
     readonly_fields = ("last_login", "date_joined", "updated_at")
+
     fieldsets = (
-        (None, {"fields": ("phone_number", "password")}),
-        ("Personal info", {"fields": ("first_name", "last_name", "email")}),
-        ("Permissions", {"fields": ("is_active", "is_staff", "is_superuser", "groups", "user_permissions")}),
+        (None, {"fields": ("email", "password")}),
+        ("Personal info", {"fields": ("first_name", "last_name", "phone_number")}),
+        (
+            "Permissions",
+            {
+                "fields": (
+                    "is_active",
+                    "is_staff",
+                    "is_superuser",
+                    "groups",
+                    "user_permissions",
+                )
+            },
+        ),
         ("Important dates", {"fields": ("last_login", "date_joined", "updated_at")}),
     )
+
     add_fieldsets = (
-        (None, {
-            "classes": ("wide",),
-            "fields": ("phone_number", "first_name", "last_name", "email", "password1", "password2"),
-        }),
+        (
+            None,
+            {
+                "classes": ("wide",),
+                "fields": (
+                    "email",
+                    "first_name",
+                    "last_name",
+                    "phone_number",
+                    "password1",
+                    "password2",
+                ),
+            },
+        ),
     )
+
     actions = ["activate_users", "deactivate_users"]
 
     @admin.action(description="Activate selected users")
@@ -57,6 +91,7 @@ class UserAdmin(DjangoUserAdmin):
     def deactivate_users(self, request, queryset):
         updated = queryset.exclude(pk=request.user.pk).update(is_active=False)
         self.message_user(request, f"{updated} user(s) deactivated.")
+
 
 class KYCDocumentInline(admin.TabularInline):
     model = KYCDocument

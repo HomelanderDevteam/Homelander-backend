@@ -12,6 +12,8 @@ from dotenv import load_dotenv
 BASE_DIR = Path(__file__).resolve().parent.parent.parent
 load_dotenv(BASE_DIR / ".env")
 
+GOOGLE_CLIENT_ID = os.environ.get("GOOGLE_CLIENT_ID", "")
+
 
 def env_bool(name, default=False):
     return os.environ.get(name, str(default)).strip().lower() in ("1", "true", "yes", "on")
@@ -125,8 +127,10 @@ REST_FRAMEWORK = {
     "DEFAULT_THROTTLE_RATES": {
         "login": os.environ.get("THROTTLE_LOGIN", "20/min"),
         "register": os.environ.get("THROTTLE_REGISTER", "30/hour"),
+        "google": os.environ.get("THROTTLE_GOOGLE", "20/min"),
         "refresh": os.environ.get("THROTTLE_REFRESH", "60/min"),
         "password": os.environ.get("THROTTLE_PASSWORD", "10/hour"),
+
     },
 }
 
