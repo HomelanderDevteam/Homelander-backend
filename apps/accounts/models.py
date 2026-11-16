@@ -10,32 +10,53 @@ from common.phone import normalize_phone
 
 from .managers import UserManager
 
-
 def _clean_email(value):
-    return (value or "").strip().lower() or None
+    return (value or "").strip().lower()
 
 
 class User(AbstractBaseUser, PermissionsMixin):
-    """The `users` table from the ERD.
-
-    There is deliberately NO role field. Whether someone is an approved owner or agent
-    comes from their approved applications (added with the KYC feature), not from a label.
+    """
+    HomeLander user account.
+    Email is the primary login identifier.
+    Phone number is optional.
     """
 
-    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    id = models.UUIDField(
+        primary_key=True,
+        default=uuid.uuid4,
+        editable=False,
+    )
+
     first_name = models.CharField(max_length=100)
     last_name = models.CharField(max_length=100)
-    email = models.EmailField(max_length=255, unique=True, null=True, blank=True)
-    phone_number = models.CharField(max_length=20, unique=True)
+
+    email = models.EmailField(
+        max_length=255,
+        unique=True,
+    )
+
+    google_sub = models.CharField(
+        max_length=255,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
+    phone_number = models.CharField(
+        max_length=20,
+        unique=True,
+        null=True,
+        blank=True,
+    )
+
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)
     date_joined = models.DateTimeField(default=timezone.now)
     updated_at = models.DateTimeField(auto_now=True)
-    # password, last_login, is_superuser, groups, user_permissions come from the Django base classes
 
     objects = UserManager()
 
-    USERNAME_FIELD = "phone_number"
+    USERNAME_FIELD = "email"
     REQUIRED_FIELDS = ["first_name", "last_name"]
 
     class Meta:
@@ -43,7 +64,7 @@ class User(AbstractBaseUser, PermissionsMixin):
         ordering = ["-date_joined"]
 
     def __str__(self):
-        return f"{self.full_name} ({self.phone_number})"
+        return f"{self.full_name} ({self.email})"
 
     @property
     def full_name(self):
@@ -51,15 +72,35 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def clean(self):
         super().clean()
+
         self.email = _clean_email(self.email)
+
+        if self.phone_number:
+            try:
+                self.phone_number = normalize_phone(self.phone_number)
+            except ValueError as exc:
+                raise ValidationError({"phone_number": str(exc)})
+        else:
+            self.phone_number = None
+
+
+def save(self, *args, **kwargs):
+    self.email = _clean_email(self.email)
+
+    if not self.email:
+        raise ValidationError({
+            "email": "An email address is required."
+        })
+
+    if self.phone_number:
         try:
             self.phone_number = normalize_phone(self.phone_number)
         except ValueError as exc:
             raise ValidationError({"phone_number": str(exc)})
+    else:
+        self.phone_number = None
 
-    def save(self, *args, **kwargs):
-        self.email = _clean_email(self.email)  # blank email must be NULL so it stays unique
-        super().save(*args, **kwargs)
+    super().save(*args, **kwargs)
 
 def kyc_upload_path(instance, filename):
     ext = os.path.splitext(filename)[1].lower()

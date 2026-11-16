@@ -1,9 +1,13 @@
+import os
+
 from django.contrib.auth.password_validation import validate_password
 from django.core.exceptions import ValidationError as DjangoValidationError
 from rest_framework import serializers
 
 from common.phone import normalize_phone
 from .models import KYCDocument, KYCSubmission, User
+
+
 import os
 
 from .models import User
@@ -46,71 +50,143 @@ class TokenPairSerializer(serializers.Serializer):
 # ---------------------------------------------------------------------------
 # What the API accepts. Only the fields listed here can ever be set by the app.
 # ---------------------------------------------------------------------------
+
 class RegisterSerializer(serializers.Serializer):
     first_name = serializers.CharField(max_length=100)
     last_name = serializers.CharField(max_length=100)
-    phone_number = serializers.CharField(max_length=20)
-    email = serializers.EmailField(max_length=255, required=False, allow_null=True, allow_blank=True)
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
-    password_confirm = serializers.CharField(write_only=True, style={"input_type": "password"})
+    email = serializers.EmailField(max_length=255)
+    phone_number = serializers.CharField(
+        max_length=20,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
+    password = serializers.CharField(
+        write_only=True,
+        style={"input_type": "password"},
+    )
+    password_confirm = serializers.CharField(
+        write_only=True,
+        style={"input_type": "password"},
+    )
+
+    def validate_email(self, value):
+        value = value.strip().lower()
+
+        if User.objects.filter(email__iexact=value).exists():
+            raise serializers.ValidationError(
+                "An account with this email already exists."
+            )
+
+        return value
 
     def validate_phone_number(self, value):
+        if not value:
+            return None
+
         try:
             phone = normalize_phone(value)
         except ValueError as exc:
             raise serializers.ValidationError(str(exc))
-        if User.objects.filter(phone_number=phone).exists():
-            raise serializers.ValidationError("An account with this phone number already exists.")
-        return phone
 
-    def validate_email(self, value):
-        value = (value or "").strip().lower()
-        if not value:
-            return None
-        if User.objects.filter(email=value).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
-        return value
+        if User.objects.filter(phone_number=phone).exists():
+            raise serializers.ValidationError(
+                "An account with this phone number already exists."
+            )
+
+        return phone
 
     def validate(self, attrs):
         if attrs["password"] != attrs["password_confirm"]:
-            raise serializers.ValidationError({"password_confirm": "Passwords do not match."})
+            raise serializers.ValidationError({
+                "password_confirm": "Passwords do not match."
+            })
+
         candidate = User(
-            first_name=attrs["first_name"], last_name=attrs["last_name"],
-            email=attrs.get("email"), phone_number=attrs["phone_number"],
+            first_name=attrs["first_name"],
+            last_name=attrs["last_name"],
+            email=attrs["email"],
+            phone_number=attrs.get("phone_number"),
         )
+
         try:
             validate_password(attrs["password"], user=candidate)
         except DjangoValidationError as exc:
-            raise serializers.ValidationError({"password": list(exc.messages)})
+            raise serializers.ValidationError({
+                "password": list(exc.messages)
+            })
+
         return attrs
 
 
+
 class LoginSerializer(serializers.Serializer):
-    identifier = serializers.CharField(help_text="Phone number or email address")
-    password = serializers.CharField(write_only=True, style={"input_type": "password"})
+    email = serializers.EmailField(
+        help_text="Registered email address"
+    )
+    password = serializers.CharField(
+        write_only=True,
+        style={"input_type": "password"},
+    )
+
+    def validate_email(self, value):
+        return value.strip().lower()
+
+
+
+class GoogleAuthSerializer(serializers.Serializer):
+    id_token = serializers.CharField(
+        write_only=True,
+        trim_whitespace=True,
+    )
+
+    phone_number = serializers.CharField(
+        max_length=20,
+        required=False,
+        allow_null=True,
+        allow_blank=True,
+    )
+
+    def validate_phone_number(self, value):
+        if not value:
+            return None
+
+        try:
+            return normalize_phone(value)
+        except ValueError as exc:
+            raise serializers.ValidationError(str(exc))
+
+
+
 
 
 class LogoutSerializer(serializers.Serializer):
     refresh = serializers.CharField()
 
 
-class ProfileUpdateSerializer(serializers.ModelSerializer):
-    """Fields a user may change about themselves. Phone number is not here on purpose:
-    changing it must be verified first (added with phone verification)."""
 
-    email = serializers.EmailField(max_length=255, required=False, allow_null=True, allow_blank=True)
+class ProfileUpdateSerializer(serializers.ModelSerializer):
+    email = serializers.EmailField(
+        max_length=255,
+        required=False,
+    )
 
     class Meta:
         model = User
         fields = ["first_name", "last_name", "email"]
 
     def validate_email(self, value):
-        value = (value or "").strip().lower()
-        if not value:
-            return None
-        if User.objects.filter(email=value).exclude(pk=self.instance.pk).exists():
-            raise serializers.ValidationError("An account with this email already exists.")
+        value = value.strip().lower()
+
+        if User.objects.filter(
+            email__iexact=value
+        ).exclude(pk=self.instance.pk).exists():
+            raise serializers.ValidationError(
+                "An account with this email already exists."
+            )
+
         return value
+
 
 
 class ChangePasswordSerializer(serializers.Serializer):

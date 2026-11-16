@@ -1,3 +1,4 @@
+
 from drf_spectacular.utils import OpenApiResponse, extend_schema
 from rest_framework import status
 from rest_framework.permissions import AllowAny, IsAuthenticated
@@ -6,25 +7,22 @@ from rest_framework.throttling import ScopedRateThrottle
 from rest_framework.views import APIView
 from rest_framework_simplejwt.views import TokenRefreshView
 from rest_framework.parsers import FormParser, MultiPartParser
-from rest_framework.parsers import FormParser, MultiPartParser
 
-
-
-from . import selectors
-
-from . import services
+from . import selectors, services
 from .serializers import (
     AuthResponseSerializer,
     ChangePasswordSerializer,
     LoginSerializer,
+    GoogleAuthSerializer,
     LogoutSerializer,
     ProfileUpdateSerializer,
     RegisterSerializer,
     TokenPairSerializer,
     UserSerializer,
     KYCSubmissionSerializer,
-    KYCSubmitSerializer
+    KYCSubmitSerializer,
 )
+
 
 TAG = ["Authentication"]
 
@@ -50,24 +48,84 @@ class RegisterView(PublicAPIView):
         serializer = RegisterSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         data = serializer.validated_data
+
         user = services.register_user(
-            first_name=data["first_name"], last_name=data["last_name"],
-            phone_number=data["phone_number"], email=data.get("email"), password=data["password"],
+            first_name=data["first_name"],
+            last_name=data["last_name"],
+            email=data["email"],
+            phone_number=data.get("phone_number"),
+            password=data["password"],
         )
+
         tokens = services.issue_tokens_for_user(user)
-        return Response({"user": UserSerializer(user).data, **tokens}, status=status.HTTP_201_CREATED)
+
+        return Response(
+            {
+                "user": UserSerializer(user).data,
+                **tokens,
+            },
+            status=status.HTTP_201_CREATED,
+        )
+
 
 
 class LoginView(PublicAPIView):
     throttle_scope = "login"
 
-    @extend_schema(request=LoginSerializer, responses={200: AuthResponseSerializer}, tags=TAG,
-                   summary="Log in with phone number or email")
+    @extend_schema(
+        request=LoginSerializer,
+        responses={200: AuthResponseSerializer},
+        tags=TAG,
+        summary="Log in with email and password",
+    )
     def post(self, request):
         serializer = LoginSerializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        user, tokens = services.login_user(**serializer.validated_data)
-        return Response({"user": UserSerializer(user).data, **tokens}, status=status.HTTP_200_OK)
+
+        user, tokens = services.login_user(
+            **serializer.validated_data
+        )
+
+        return Response(
+            {
+                "user": UserSerializer(user).data,
+                **tokens,
+            },
+            status=status.HTTP_200_OK,
+        )
+
+
+class GoogleAuthView(PublicAPIView):
+    throttle_scope = "google"
+
+    @extend_schema(
+        request=GoogleAuthSerializer,
+        responses={200: AuthResponseSerializer},
+        tags=TAG,
+        summary="Sign up or log in with Google",
+        description=(
+            "Authenticates a Google account using its verified email. "
+            "A phone number is optional."
+        ),
+    )
+    def post(self, request):
+        serializer = GoogleAuthSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+
+        data = serializer.validated_data
+
+        user, tokens = services.google_authenticate(
+            token=data["id_token"],
+            phone_number=data.get("phone_number"),
+        )
+
+        return Response(
+            {
+                "user": UserSerializer(user).data,
+                **tokens,
+            },
+            status=status.HTTP_200_OK,
+        )
 
 
 class RefreshView(TokenRefreshView):

@@ -1,0 +1,34 @@
+
+<!DOCTYPE html>
+<html>
+<head>
+    <title>HomeLander Google Login Test</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+</head>
+<body>
+    <h2>HomeLander Google Authentication Test</h2>
+
+    <div id="g_id_onload"
+         data-client_id="48685945772-6a0tq82cjmn93qjgv6oejgbu0p8jnu2t.apps.googleusercontent.com"
+
+         data-callback="handleCredentialResponse">
+    </div>
+
+    <div class="g_id_signin"
+         data-type="standard"
+         data-size="large"
+         data-theme="outline"
+         data-text="signin_with"
+         data-shape="rectangular">
+    </div>
+
+    <script>
+        function handleCredentialResponse(response) {
+            console.log("Google ID Token:", response.credential);
+            alert("Google sign-in successful! Open the browser console to copy your ID token.");
+        }
+        console.log("Google Client ID:", document.getElementById("g_id_onload").dataset.clientId);
+    </script>
+
+</body>
+</html>

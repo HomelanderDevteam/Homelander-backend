@@ -1,21 +1,16 @@
 """Read-only queries for the accounts app."""
-from common.phone import normalize_phone
 
 from .models import User
 
 
-def get_user_by_identifier(identifier):
-    """Find a user by phone number or email. Returns None if nothing matches."""
-    identifier = (identifier or "").strip()
-    if not identifier:
+def get_user_by_email(email):
+    """Find a user by email. Returns None if nothing matches."""
+    if not email:
         return None
-    if "@" in identifier:
-        return User.objects.filter(email=identifier.lower()).first()
-    try:
-        phone = normalize_phone(identifier)
-    except ValueError:
-        return None
-    return User.objects.filter(phone_number=phone).first()
+
+    email = email.strip().lower()
+    return User.objects.filter(email=email).first()
+
 
 def get_latest_kyc(user):
     return user.kyc_submissions.prefetch_related("documents").first()
