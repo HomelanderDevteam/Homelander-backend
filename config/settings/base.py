@@ -47,11 +47,12 @@ THIRD_PARTY_APPS = [
 ]
 LOCAL_APPS = [
     "apps.accounts",
+    "apps.waitlist",
     # Next features go here, one app each:
     # "apps.kyc", "apps.properties", "apps.verification",
     # "apps.chat", "apps.payments", "apps.commissions", "apps.audit",
 ]
-INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
+INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS 
 
 AUTH_USER_MODEL = "accounts.User"
 AUTHENTICATION_BACKENDS = ["apps.accounts.backends.IdentifierBackend"]
